@@ -2,18 +2,65 @@
 
 Cross-session awareness for AI coding tools. Each new session knows what you were working on — without context bloat.
 
+Works with **Claude Code**, **Codex CLI**, **Gemini CLI**, and **Cursor**.
+
 ## The Problem
 
-Every new AI coding session starts cold. You re-explain which repo, what you were doing, what decisions were made. Context windows grow if you try to load everything. Memories go in but nothing comes back out.
+Every new AI coding session starts cold. You re-explain which repo, what you were doing, what decisions were made. Context windows grow if you try to load everything.
 
 ## The Solution
 
-A lightweight, rolling session chronicle shared across all your AI tools:
+A rolling session chronicle — a single markdown file shared across all your AI tools:
 
-- **Fixed cost**: ~300 tokens injected once at session start, never grows
+- **Fixed cost**: ~300 tokens at session start, never grows mid-session
 - **Rolling window**: Last 20 sessions, oldest auto-trimmed
-- **Cross-tool**: Works with Claude Code, Codex CLI, Gemini CLI, Cursor
-- **Not assumptive**: Presents recent work as context, doesn't assume continuation
+- **Cross-tool**: All tools read/write the same file
+- **Not assumptive**: Shows recent work as context, doesn't assume continuation
+
+## Setup
+
+### Requirements
+
+- Python 3.8+ (stdlib only, no pip dependencies)
+- One or more supported AI tools
+
+### Install
+
+```bash
+git clone https://github.com/OutcomefocusAi/session-coherence.git
+cd session-coherence
+bash install.sh all          # Install for all tools
+```
+
+Or pick specific tools:
+
+```bash
+bash install.sh claude-code          # Claude Code only
+bash install.sh codex gemini         # Codex + Gemini
+bash install.sh cursor               # Cursor only
+```
+
+The installer:
+1. Copies `chronicle-manager.py` to `~/.session-coherence/`
+2. Initializes the chronicle file at `~/.session-coherence/chronicle.md`
+3. Installs the adapter for each selected tool (hooks, rules, instruction files)
+4. Auto-patches `settings.json` for Claude Code (no manual JSON editing)
+
+### What Gets Installed Per Tool
+
+| Tool | What's Installed | How It Works |
+|------|-----------------|-------------|
+| **Claude Code** | Hook (`~/.claude/hooks/session-briefing.py`) + Rule (`~/.claude/rules/session-coherence.md`) + settings.json entry | Hook auto-injects briefing at session start. Rule tells Claude when to write entries. |
+| **Codex CLI** | Instructions appended to `~/.codex/AGENTS.md` | Codex reads chronicle when instructed. Writes entries at breakpoints. |
+| **Gemini CLI** | Instructions appended to `~/.gemini/GEMINI.md` | Gemini reads chronicle when instructed. Writes entries at breakpoints. |
+| **Cursor** | Rule at `~/.cursor/rules/session-coherence.md` | Cursor reads chronicle when instructed. Writes entries at breakpoints. |
+
+### Verify
+
+```bash
+python ~/.session-coherence/chronicle-manager.py status
+python ~/.session-coherence/chronicle-manager.py briefing
+```
 
 ## How It Works
 
@@ -22,12 +69,12 @@ Session Start                    During Session                Session End
 ┌─────────────┐                 ┌──────────────┐             ┌─────────────┐
 │ Read         │                 │ No auto-     │             │ Write 3-5   │
 │ chronicle    │──> ~300 token   │ injection    │             │ bullet      │──> chronicle
-│ (last 20     │    briefing     │ Zero context │             │ summary     │    updated
-│  sessions)   │    (one-time)   │ cost         │             │             │
+│ (last 20     │    briefing     │ Zero cost    │             │ summary     │    updated
+│  sessions)   │    (one-time)   │ mid-session  │             │             │
 └─────────────┘                 └──────────────┘             └─────────────┘
 ```
 
-### Example Briefing
+### Example Briefing (what you see at session start)
 
 ```
 ## Session Briefing
@@ -44,7 +91,7 @@ Recent work:
 Active projects: outcome-focus (M2 done, M3 next), claude-voice (PTT blocked)
 ```
 
-### Example Chronicle Entry
+### Example Chronicle Entry (what gets written)
 
 ```markdown
 ### 2026-03-16 16:45 | outcome-focus | M2 webhook fix
@@ -55,75 +102,68 @@ Active projects: outcome-focus (M2 done, M3 next), claude-voice (PTT blocked)
 - Status: M2 complete, M3 planning next
 ```
 
-## Install
-
-```bash
-git clone https://github.com/OutcomefocusAi/session-coherence.git
-cd session-coherence
-
-# Install for specific tools
-./install.sh claude-code
-./install.sh codex gemini
-./install.sh all
-```
-
-### Tool-Specific Setup
-
-| Tool | Adapter | How It Works |
-|------|---------|-------------|
-| **Claude Code** | SessionStart hook | Auto-injects briefing on every session start |
-| **Codex CLI** | AGENTS.md | Instructions tell Codex to read chronicle |
-| **Gemini CLI** | GEMINI.md | Instructions tell Gemini to read chronicle |
-| **Cursor** | .cursorrules | Rules snippet tells Cursor to read chronicle |
-
 ## CLI Reference
 
 ```bash
-# Show current status
+# Check status
 python ~/.session-coherence/chronicle-manager.py status
 
-# Generate briefing (what the hook shows)
+# Generate briefing (what the session start hook shows)
 python ~/.session-coherence/chronicle-manager.py briefing
 
-# Add a session entry
+# Add a session entry (auto-rotates if > 20 entries)
 python ~/.session-coherence/chronicle-manager.py add \
   --project "my-app" \
   --title "Added auth flow" \
   --bullets "- Implemented JWT auth in api/auth.ts" \
            "- Added login/signup pages" \
-           "- Tests passing (23/23)"
+           "- Tests passing (23/23)" \
+           "- Status: auth complete, need password reset next"
 
-# Rotate old entries (auto-runs on add)
+# Manually rotate (usually not needed — add auto-rotates)
 python ~/.session-coherence/chronicle-manager.py rotate --max-entries 20
 
-# Initialize (first time)
+# Initialize fresh (first time only)
 python ~/.session-coherence/chronicle-manager.py init
 ```
 
 ## Architecture
 
 ```
-~/.session-coherence/
-├── chronicle.md            # The data — plain markdown, shared by all tools
-└── chronicle-manager.py    # The CLI — parse, format, add, rotate
+~/.session-coherence/               ← Shared by all tools
+├── chronicle.md                    ← The data (plain markdown, last 20 sessions)
+└── chronicle-manager.py            ← The CLI (Python 3.8+, stdlib only)
 
-Adapters (per tool):
-├── claude-code/            # Hook + rule (auto-injects at session start)
-├── codex/                  # AGENTS.md (instruction-based)
-├── gemini/                 # GEMINI.md (instruction-based)
-└── cursor/                 # .cursorrules snippet (instruction-based)
+Per-tool adapters (installed to tool-specific locations):
+├── Claude Code  → ~/.claude/hooks/ + ~/.claude/rules/
+├── Codex CLI    → ~/.codex/AGENTS.md
+├── Gemini CLI   → ~/.gemini/GEMINI.md
+└── Cursor       → ~/.cursor/rules/
 ```
 
 **Key design decisions:**
-- **No external services** — just files and a Python script (stdlib only)
-- **No per-prompt injection** — briefing injected once, not on every message
-- **Tool-agnostic data format** — plain markdown, any tool can read/write it
-- **Fixed token budget** — ~300 tokens at session start, never grows mid-session
+- **No external services** — just files and a Python script
+- **No per-prompt injection** — briefing injected once at session start, never mid-conversation
+- **No pip dependencies** — Python stdlib only, runs everywhere
+- **Tool-agnostic data** — plain markdown, any tool can read/write it
+- **Fixed token budget** — ~300 tokens at session start, doesn't grow
 
-## Requirements
+## Entry Writing Protocol (for all tools)
 
-- Python 3.8+
-- No pip dependencies (stdlib only)
+**When to write:**
+- After completing a significant task or milestone
+- Before clearing context / starting fresh
+- When the user signals they're done
+
+**What to write:**
+- 3-5 bullets: what changed, key decisions, current status, next steps
+- Specific enough to resume cold without re-explaining
+- From the user's perspective, not implementation minutiae
+
+**What NOT to do:**
+- Don't update for trivial interactions
+- Don't assume the user wants to continue their last task
+- Don't write a novel — 50-80 tokens per entry
 
 ## License
 
