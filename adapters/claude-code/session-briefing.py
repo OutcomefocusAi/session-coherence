@@ -1,13 +1,25 @@
 #!/usr/bin/env python3
 """Claude Code SessionStart hook — injects cross-session briefing into context.
 
-Calls chronicle-manager.py for the briefing, then optionally appends
-Qdrant guard memories if available locally.
+Calls chronicle-manager.py for the briefing, then runs any plugins found
+in ~/.session-coherence/plugins/ to extend/modify the briefing.
+
+Plugin system:
+  - Place .py files in ~/.session-coherence/plugins/
+  - Each plugin must define: hook(briefing_text: str) -> str
+  - Plugins are loaded in alphabetical order
+  - If a plugin fails, it is skipped with a warning (never blocks session start)
+
+Example plugin (~/.session-coherence/plugins/greeting.py):
+
+    def hook(briefing_text: str) -> str:
+        return briefing_text + "\\n\\nGood morning! Remember to check PRs."
 
 Install: Copy to ~/.claude/hooks/ and add to settings.json SessionStart hooks.
 Must always exit 0 — never block session start.
 """
 
+import importlib.util
 import json
 import os
 import subprocess
@@ -19,9 +31,38 @@ if os.environ.get('PAPERCLIP_AGENT_ID'):
     sys.exit(0)
 
 
-# chronicle-manager.py location — set by installer or default to repo location
-MANAGER_SCRIPT = Path.home() / ".session-coherence" / "chronicle-manager.py"
-QDRANT_URL = "http://localhost:6333"
+# Cross-platform paths
+COHERENCE_DIR = Path.home() / ".session-coherence"
+MANAGER_SCRIPT = COHERENCE_DIR / "chronicle-manager.py"
+PLUGINS_DIR = COHERENCE_DIR / "plugins"
+CONFIG_FILE = COHERENCE_DIR / "config.json"
+
+
+def detect_python():
+    """Return the Python command available on this system."""
+    # On Windows, 'py' is the launcher; on Unix, 'python3' is standard
+    candidates = ["python3", "python", "py"] if os.name != "nt" else ["py", "python3", "python"]
+    for cmd in candidates:
+        try:
+            result = subprocess.run(
+                [cmd, "--version"], capture_output=True, text=True, timeout=3
+            )
+            if result.returncode == 0 and "Python 3" in result.stdout + result.stderr:
+                return cmd
+        except Exception:
+            continue
+    return "python"
+
+
+def get_config():
+    """Load config.json if it exists."""
+    if CONFIG_FILE.exists():
+        try:
+            with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {}
 
 
 def get_briefing():
@@ -30,11 +71,20 @@ def get_briefing():
         return ""
 
     try:
+        python_cmd = detect_python()
         env = os.environ.copy()
         env["PYTHONIOENCODING"] = "utf-8"
+
+        cmd = [python_cmd, str(MANAGER_SCRIPT), "briefing"]
+
+        # Check config for briefing_format
+        config = get_config()
+        briefing_format = config.get("briefing_format")
+        if briefing_format:
+            cmd.extend(["--format", str(briefing_format)])
+
         result = subprocess.run(
-            ["python", str(MANAGER_SCRIPT), "briefing"],
-            capture_output=True, text=True, timeout=3, env=env
+            cmd, capture_output=True, text=True, timeout=3, env=env
         )
         if result.returncode == 0:
             return result.stdout.strip()
@@ -43,43 +93,37 @@ def get_briefing():
     return ""
 
 
-def get_qdrant_guards():
-    """Pull guard memories from local Qdrant if available."""
-    try:
-        import requests
-        resp = requests.get(f"{QDRANT_URL}/", timeout=1)
-        if resp.status_code != 200:
-            return []
-    except Exception:
-        return []
+def run_plugins(briefing_text):
+    """Load and run plugins from ~/.session-coherence/plugins/ in alphabetical order."""
+    if not PLUGINS_DIR.is_dir():
+        return briefing_text
 
-    try:
-        script = Path.home() / ".claude" / "scripts" / "qdrant-memory.py"
-        if not script.exists():
-            return []
+    plugin_files = sorted(PLUGINS_DIR.glob("*.py"))
+    if not plugin_files:
+        return briefing_text
 
-        result = subprocess.run(
-            ["python", str(script), "search-memory",
-             "guard never always must not prefer not", "--limit", "5"],
-            capture_output=True, text=True, timeout=4
-        )
-        if result.returncode != 0:
-            return []
+    for plugin_path in plugin_files:
+        try:
+            spec = importlib.util.spec_from_file_location(
+                f"sc_plugin_{plugin_path.stem}", str(plugin_path)
+            )
+            if spec is None or spec.loader is None:
+                continue
 
-        data = json.loads(result.stdout)
-        guards = []
-        for item in data:
-            payload = item.get("payload", item)
-            guard_type = payload.get("guard_type", "")
-            if guard_type in ("hard", "soft"):
-                text = payload.get("text", "")
-                if text:
-                    if len(text) > 80:
-                        text = text[:77] + "..."
-                    guards.append(text)
-        return guards[:3]
-    except Exception:
-        return []
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+
+            if hasattr(module, "hook") and callable(module.hook):
+                result = module.hook(briefing_text)
+                if isinstance(result, str):
+                    briefing_text = result
+        except Exception as e:
+            # Log warning but never block session start
+            print(f"[session-coherence] plugin {plugin_path.name} failed: {e}",
+                  file=sys.stderr)
+            continue
+
+    return briefing_text
 
 
 def main():
@@ -88,12 +132,11 @@ def main():
         if not briefing:
             sys.exit(0)
 
-        print(briefing)
+        # Run plugins to extend/modify the briefing
+        briefing = run_plugins(briefing)
 
-        # Append guards if Qdrant is available (Claude Code specific)
-        guards = get_qdrant_guards()
-        if guards:
-            print(f"\nGuards: {' | '.join(guards)}")
+        if briefing:
+            print(briefing)
 
     except Exception:
         pass

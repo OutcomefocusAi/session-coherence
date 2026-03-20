@@ -1,0 +1,9 @@
+include chronicle-manager.py
+include install.sh
+include LICENSE
+include README.md
+include CLAUDE.md
+include AGENTS.md
+include GEMINI.md
+recursive-include adapters *
+recursive-include session_coherence *

@@ -1,10 +1,8 @@
-# Session Coherence — Setup Instructions for Codex CLI
+# Session Coherence v2.0 — Setup for Codex CLI
 
-This repo provides cross-session awareness for AI coding tools. When a user opens this repo, **help them set it up**.
+Cross-tool session memory for AI coding assistants. Zero dependencies, 9 tools supported.
 
 ## Quick Setup
-
-Run from the repo root:
 
 ```bash
 bash install.sh codex
@@ -12,58 +10,45 @@ bash install.sh codex
 
 This will:
 1. Copy `chronicle-manager.py` to `~/.session-coherence/`
-2. Initialize `~/.session-coherence/chronicle.md` (the rolling session log)
-3. Copy the Codex instruction file to `~/.codex/AGENTS.md`
+2. Initialize `~/.session-coherence/chronicle.md`
+3. Append session coherence protocol to `~/.codex/AGENTS.md`
 
-If `~/.codex/AGENTS.md` already exists, append the contents of `adapters/codex/AGENTS.md` to it manually.
+## How It Works
 
-## How It Works After Setup
+**At session start**: Read `~/.session-coherence/chronicle.md` for context on recent work across all AI tools. Do NOT assume continuation — wait for direction.
 
-Once installed, Codex should:
-
-1. **At session start**: Read `~/.session-coherence/chronicle.md` for context on recent work across all AI tools
-2. **At natural breakpoints** (task complete, user says "done"): Write a session entry
-
-### Reading the Chronicle
-
-The chronicle at `~/.session-coherence/chronicle.md` is a markdown file with entries like:
-
-```markdown
-### 2026-03-16 16:45 | my-project | Added auth flow
-- Implemented JWT auth in api/auth.ts
-- Added login/signup pages
-- Tests passing (23/23)
-- Status: auth complete, need to add password reset
-```
-
-Use this for awareness of recent work. Do NOT assume the user wants to continue — wait for direction.
-
-### Writing an Entry
-
-Use the CLI:
+**At breakpoints** (task complete, user says "done"): Write an entry:
 
 ```bash
 python ~/.session-coherence/chronicle-manager.py add \
   --project "project-name" \
   --title "short title" \
-  --bullets "- What changed" "- Key decisions" "- Current status"
+  --bullets "- What changed" \
+           "- [decision] Key choice and reasoning" \
+           "- [status] Current state" \
+           "- [next] Follow-up needed"
 ```
 
-Or edit `~/.session-coherence/chronicle.md` directly — new entries at the TOP.
+## Semantic Tags
 
-### Rules
+| Tag | Purpose |
+|-----|---------|
+| `[change]` | What was modified (default) |
+| `[decision]` | Choices made with reasoning |
+| `[blocker]` | What's stuck |
+| `[status]` | Current project state |
+| `[next]` | Immediate follow-up |
+| `[priority]` | Top focus item |
 
-- 3-5 bullets per entry, specific not vague
-- Capture decisions and blockers (highest value)
-- Don't update for trivial interactions
-- Don't assume continuation — the chronicle is awareness, not instructions
+## CLI
+
+```bash
+python ~/.session-coherence/chronicle-manager.py status      # Check state
+python ~/.session-coherence/chronicle-manager.py briefing    # Generate briefing
+python ~/.session-coherence/chronicle-manager.py search "X"  # Search history
+python ~/.session-coherence/chronicle-manager.py analytics   # Session stats
+```
 
 ## Also Supports
 
-Claude Code, Gemini CLI, Cursor — run `bash install.sh all` to set up everything.
-
-## Verify
-
-```bash
-python ~/.session-coherence/chronicle-manager.py status
-```
+Claude Code, Gemini CLI, Cursor, Aider, Windsurf, Cline, Copilot, Zed — run `bash install.sh all`

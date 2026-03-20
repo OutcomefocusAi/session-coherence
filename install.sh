@@ -54,14 +54,14 @@ TOOLS="$@"
 
 if [ -z "$TOOLS" ]; then
     echo "Which tools do you use? (space-separated, or 'all')"
-    echo "  Available: claude-code  codex  gemini  cursor"
+    echo "  Available: claude-code  codex  gemini  cursor  aider  windsurf  cline  copilot  zed"
     echo ""
     read -rp "> " TOOLS
     echo ""
 fi
 
 if [ "$TOOLS" = "all" ]; then
-    TOOLS="claude-code codex gemini cursor"
+    TOOLS="claude-code codex gemini cursor aider windsurf cline copilot zed"
 fi
 
 # --- Install each adapter ---
@@ -184,9 +184,101 @@ except Exception as e:
             echo ""
             ;;
 
+        aider)
+            echo "--- Aider ---"
+            AIDER_GLOBAL="$HOME/.aider.conventions.md"
+
+            if [ -f "$AIDER_GLOBAL" ]; then
+                if grep -q "session-coherence" "$AIDER_GLOBAL" 2>/dev/null; then
+                    echo "  Session coherence already in .aider.conventions.md"
+                else
+                    echo "" >> "$AIDER_GLOBAL"
+                    cat "$SCRIPT_DIR/adapters/aider/conventions.md" >> "$AIDER_GLOBAL"
+                    echo "  Appended session coherence protocol to $AIDER_GLOBAL"
+                fi
+            else
+                cp "$SCRIPT_DIR/adapters/aider/conventions.md" "$AIDER_GLOBAL"
+                echo "  Created $AIDER_GLOBAL"
+            fi
+            echo ""
+            ;;
+
+        windsurf)
+            echo "--- Windsurf ---"
+            WINDSURF_DIR="$HOME/.windsurf/rules"
+            mkdir -p "$WINDSURF_DIR"
+
+            if [ -f "$WINDSURF_DIR/session-coherence.md" ]; then
+                echo "  Session coherence rule already exists"
+            else
+                cp "$SCRIPT_DIR/adapters/windsurf/rules.md" "$WINDSURF_DIR/session-coherence.md"
+                echo "  Created $WINDSURF_DIR/session-coherence.md"
+            fi
+            echo ""
+            ;;
+
+        cline)
+            echo "--- Cline ---"
+            CLINE_GLOBAL="$HOME/.clinerules"
+
+            if [ -f "$CLINE_GLOBAL" ]; then
+                if grep -q "session-coherence" "$CLINE_GLOBAL" 2>/dev/null; then
+                    echo "  Session coherence already in .clinerules"
+                else
+                    echo "" >> "$CLINE_GLOBAL"
+                    cat "$SCRIPT_DIR/adapters/cline/instructions.md" >> "$CLINE_GLOBAL"
+                    echo "  Appended session coherence protocol to $CLINE_GLOBAL"
+                fi
+            else
+                cp "$SCRIPT_DIR/adapters/cline/instructions.md" "$CLINE_GLOBAL"
+                echo "  Created $CLINE_GLOBAL"
+            fi
+            echo ""
+            ;;
+
+        copilot)
+            echo "--- GitHub Copilot ---"
+            COPILOT_DIR="$HOME/.github"
+            mkdir -p "$COPILOT_DIR"
+
+            if [ -f "$COPILOT_DIR/copilot-instructions.md" ]; then
+                if grep -q "session-coherence" "$COPILOT_DIR/copilot-instructions.md" 2>/dev/null; then
+                    echo "  Session coherence already in copilot-instructions.md"
+                else
+                    echo "" >> "$COPILOT_DIR/copilot-instructions.md"
+                    cat "$SCRIPT_DIR/adapters/copilot/instructions.md" >> "$COPILOT_DIR/copilot-instructions.md"
+                    echo "  Appended session coherence protocol to $COPILOT_DIR/copilot-instructions.md"
+                fi
+            else
+                cp "$SCRIPT_DIR/adapters/copilot/instructions.md" "$COPILOT_DIR/copilot-instructions.md"
+                echo "  Created $COPILOT_DIR/copilot-instructions.md"
+            fi
+            echo ""
+            ;;
+
+        zed)
+            echo "--- Zed ---"
+            ZED_DIR="$HOME/.config/zed"
+            mkdir -p "$ZED_DIR"
+
+            if [ -f "$ZED_DIR/assistant-rules.md" ]; then
+                if grep -q "session-coherence" "$ZED_DIR/assistant-rules.md" 2>/dev/null; then
+                    echo "  Session coherence already in assistant-rules.md"
+                else
+                    echo "" >> "$ZED_DIR/assistant-rules.md"
+                    cat "$SCRIPT_DIR/adapters/zed/instructions.md" >> "$ZED_DIR/assistant-rules.md"
+                    echo "  Appended session coherence protocol to $ZED_DIR/assistant-rules.md"
+                fi
+            else
+                cp "$SCRIPT_DIR/adapters/zed/instructions.md" "$ZED_DIR/assistant-rules.md"
+                echo "  Created $ZED_DIR/assistant-rules.md"
+            fi
+            echo ""
+            ;;
+
         *)
             echo "  Unknown tool: $tool"
-            echo "  Available: claude-code, codex, gemini, cursor"
+            echo "  Available: claude-code, codex, gemini, cursor, aider, windsurf, cline, copilot, zed"
             echo ""
             ;;
     esac
@@ -201,3 +293,5 @@ echo ""
 echo "Verify:"
 echo "  $PYTHON $COHERENCE_DIR/chronicle-manager.py status"
 echo "  $PYTHON $COHERENCE_DIR/chronicle-manager.py briefing"
+echo ""
+echo "To uninstall: bash uninstall.sh all"

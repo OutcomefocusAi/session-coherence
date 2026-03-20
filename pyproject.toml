@@ -1,0 +1,52 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "session-coherence"
+version = "2.0.0"
+description = "Cross-tool session memory for AI coding assistants. Zero dependencies. Works offline."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.8"
+authors = [
+    { name = "AgileKnow", email = "agileknow@gmail.com" },
+]
+keywords = [
+    "ai",
+    "coding-assistant",
+    "memory",
+    "session",
+    "context",
+    "claude-code",
+    "cursor",
+    "codex",
+    "gemini",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+dependencies = []
+
+[project.scripts]
+session-coherence = "session_coherence.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/OutcomefocusAi/session-coherence"
+Repository = "https://github.com/OutcomefocusAi/session-coherence"
+"Bug Tracker" = "https://github.com/OutcomefocusAi/session-coherence/issues"
+
+[tool.setuptools]
+packages = ["session_coherence"]
+
+[tool.setuptools.package-data]
+session_coherence = ["*.py"]
