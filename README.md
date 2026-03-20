@@ -344,6 +344,10 @@ bash uninstall.sh all --force          # Skip confirmation prompts
 
 The uninstaller cleanly removes adapter files and auto-patches `settings.json` to remove hook entries.
 
+## Pair With Claude Learn
+
+Session Coherence tells your AI **what you've been working on**. [Claude Learn](https://github.com/OutcomeFocusAi/claude-learn) teaches your AI **how to work better** — self-improving behavioral rules with scored feedback loops and collective intelligence. Together, they give every session memory AND learning. Zero infrastructure for both.
+
 ## Contributing
 
 1. Fork the repo
