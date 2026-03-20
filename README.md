@@ -30,26 +30,29 @@ Session Coherence fixes this. It maintains a rolling chronicle of your work sess
 
 ## Quick Start
 
-### Install with pip (recommended)
-
-```bash
-pip install session-coherence
-session-coherence init
-```
+> **One install covers all your tools.** You clone the repo once, run one command, and every tool you use — Claude Code, Cursor, Gemini CLI, Codex, Aider, etc. — shares the same session history. No per-tool downloads, no separate configurations. Add a session summary in Claude Code, switch to Cursor, and Cursor sees it immediately.
 
 ### Install from source
 
 ```bash
 git clone https://github.com/OutcomeFocusAi/session-coherence.git
 cd session-coherence
-bash install.sh all          # All 9 tools
+bash install.sh all                  # All 9 tools at once
 ```
 
 Or pick specific tools:
 
 ```bash
-bash install.sh claude-code          # Claude Code only
-bash install.sh codex gemini cursor  # Multiple tools
+bash install.sh claude-code cursor gemini   # Just the ones you use
+```
+
+You can always add more tools later by re-running the installer — it won't duplicate anything.
+
+### Install with pip
+
+```bash
+pip install session-coherence
+session-coherence init
 ```
 
 ### Verify
