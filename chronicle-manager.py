@@ -5,7 +5,7 @@ A shared CLI for managing a rolling log of AI coding sessions.
 Works with any AI tool (Claude Code, Codex CLI, Gemini CLI, Cursor, etc.)
 
 Usage:
-    chronicle-manager.py briefing [--detail N] [--oneliner N] [--max-bullets N]
+    chronicle-manager.py briefing [--format auto|structured|chronological]
     chronicle-manager.py add --project NAME --title TITLE [--bullets "- item1" "- item2" ...]
     chronicle-manager.py rotate [--max-entries N]
     chronicle-manager.py status
@@ -24,6 +24,11 @@ from datetime import datetime
 from pathlib import Path
 
 
+# Tag parsing for structured bullets
+TAG_RE = re.compile(r"^-\s+\[(\w+)\]\s+(.+)$")
+VALID_TAGS = {"change", "decision", "blocker", "status", "next", "priority"}
+
+
 def get_chronicle_path():
     """Get chronicle file path from env or default."""
     env_path = os.environ.get("SESSION_CHRONICLE_PATH")
@@ -33,6 +38,22 @@ def get_chronicle_path():
 
 
 CHRONICLE_HEADER = "<!-- Session Chronicle — rolling log, last 20 sessions. Oldest entries auto-trimmed. -->"
+
+
+def parse_bullet(line):
+    """Parse a bullet line into a dict with tag, text, and raw fields.
+
+    Tagged format: '- [decision] Chose JWT over sessions'
+    Untagged format: '- Fixed the login bug' (defaults to tag='change')
+    """
+    m = TAG_RE.match(line)
+    if m:
+        tag = m.group(1).lower()
+        if tag not in VALID_TAGS:
+            tag = "change"
+        return {"tag": tag, "text": m.group(2).strip(), "raw": line}
+    # Untagged bullet — strip the leading "- "
+    return {"tag": "change", "text": line[2:].strip(), "raw": line}
 
 
 def parse_chronicle(text):
@@ -57,7 +78,7 @@ def parse_chronicle(text):
         elif current:
             current["raw_lines"].append(line)
             if line.startswith("- "):
-                current["bullets"].append(line)
+                current["bullets"].append(parse_bullet(line))
 
     if current:
         entries.append(current)
@@ -73,27 +94,129 @@ def get_active_projects(entries, count=10):
         if proj and proj not in projects:
             status = ""
             for b in entry["bullets"]:
-                if b.lower().startswith("- status:"):
-                    status = b[len("- status:"):].strip()
+                # Check for [status] tag or legacy "Status:" prefix
+                if b["tag"] == "status":
+                    status = b["text"]
+                    break
+                if b["text"].lower().startswith("status:"):
+                    status = b["text"][len("status:"):].strip()
                     break
             projects[proj] = status or entry["title"]
     return projects
 
 
-def cmd_briefing(args):
-    """Generate a session briefing from the chronicle."""
-    path = get_chronicle_path()
-    if not path.exists():
-        return
+def extract_sections(entries, max_entries=10):
+    """Extract semantic sections from recent chronicle entries.
 
-    text = path.read_text(encoding="utf-8").strip()
-    if not text:
-        return
+    Returns a dict with:
+        active_threads: dict of project -> most recent status/next (max 6)
+        blockers: list of (text, project) tuples (max 4)
+        decisions: list of decision texts (max 4)
+        recent_work: list of (date, project, title) tuples (max 3)
+        focus: most recent priority or next bullet, or None
+    """
+    active_threads = {}
+    blockers = []
+    decisions = []
+    focus = None
 
-    entries = parse_chronicle(text)
-    if not entries:
-        return
+    for entry in entries[:max_entries]:
+        proj = entry["project"]
 
+        # Build active thread from status/next tags
+        if proj and proj not in active_threads:
+            for b in entry["bullets"]:
+                if b["tag"] in ("status", "next"):
+                    active_threads[proj] = b["text"]
+                    break
+            # Fallback to title if no status/next tag
+            if proj not in active_threads:
+                active_threads[proj] = entry["title"]
+
+        for b in entry["bullets"]:
+            if b["tag"] == "blocker" and len(blockers) < 4:
+                blockers.append((b["text"], proj))
+            elif b["tag"] == "decision" and len(decisions) < 4:
+                decisions.append(b["text"])
+            elif b["tag"] == "priority" and focus is None:
+                focus = b["text"]
+            elif b["tag"] == "next" and focus is None:
+                focus = b["text"]
+
+    # Trim active threads to 6
+    if len(active_threads) > 6:
+        active_threads = dict(list(active_threads.items())[:6])
+
+    recent_work = []
+    for entry in entries[:3]:
+        short_date = entry["date"].split(" ")[0] if " " in entry["date"] else entry["date"]
+        recent_work.append((short_date, entry["project"], entry["title"]))
+
+    return {
+        "active_threads": active_threads,
+        "blockers": blockers,
+        "decisions": decisions,
+        "recent_work": recent_work,
+        "focus": focus,
+    }
+
+
+def has_semantic_tags(entries, max_entries=10):
+    """Check if any recent entry has non-default tags (triggers structured mode)."""
+    for entry in entries[:max_entries]:
+        for b in entry["bullets"]:
+            if b["tag"] != "change":
+                return True
+    return False
+
+
+def format_structured_briefing(entries):
+    """Format entries as a semantic structured briefing."""
+    sections = extract_sections(entries)
+    lines = ["## Session Briefing", ""]
+
+    # Active threads
+    if sections["active_threads"]:
+        lines.append("Active Threads:")
+        for proj, status in sections["active_threads"].items():
+            lines.append(f"- {proj}: {status}")
+        lines.append("")
+
+    # Blockers
+    if sections["blockers"]:
+        lines.append("Blockers:")
+        for text, proj in sections["blockers"]:
+            lines.append(f"- {text} ({proj})")
+        lines.append("")
+
+    # Decisions
+    if sections["decisions"]:
+        lines.append("Recent Decisions:")
+        for text in sections["decisions"]:
+            lines.append(f"- {text}")
+        lines.append("")
+
+    # Recent work
+    if sections["recent_work"]:
+        lines.append("Last 3 Sessions:")
+        for date, proj, title in sections["recent_work"]:
+            lines.append(f"- {date}: {title} ({proj})")
+        lines.append("")
+
+    # Focus
+    if sections["focus"]:
+        lines.append(f"Focus: {sections['focus']}")
+        lines.append("")
+
+    # Hard cap
+    if len(lines) > 25:
+        lines = lines[:25]
+
+    return "\n".join(lines).rstrip()
+
+
+def format_chronological_briefing(entries, args):
+    """Format entries as the original chronological briefing."""
     lines = ["## Session Briefing", ""]
 
     # Detailed entries
@@ -103,8 +226,7 @@ def cmd_briefing(args):
         for entry in detailed:
             lines.append(f"- {entry['date']} | {entry['project']} | {entry['title']}")
             for bullet in entry["bullets"][:args.max_bullets]:
-                text = bullet[2:].strip()
-                lines.append(f"  > {text}")
+                lines.append(f"  > {bullet['text']}")
         lines.append("")
 
     # One-liners
@@ -128,7 +250,36 @@ def cmd_briefing(args):
     if len(lines) > 30:
         lines = lines[:30]
 
-    output = "\n".join(lines).rstrip()
+    return "\n".join(lines).rstrip()
+
+
+def cmd_briefing(args):
+    """Generate a session briefing from the chronicle."""
+    path = get_chronicle_path()
+    if not path.exists():
+        return
+
+    text = path.read_text(encoding="utf-8").strip()
+    if not text:
+        return
+
+    entries = parse_chronicle(text)
+    if not entries:
+        return
+
+    fmt = getattr(args, "format", "auto")
+
+    if fmt == "structured":
+        output = format_structured_briefing(entries)
+    elif fmt == "chronological":
+        output = format_chronological_briefing(entries, args)
+    else:
+        # Auto-detect: use structured if any tagged bullets found
+        if has_semantic_tags(entries):
+            output = format_structured_briefing(entries)
+        else:
+            output = format_chronological_briefing(entries, args)
+
     if output:
         print(output)
 
@@ -249,6 +400,10 @@ def cmd_init(args):
 
 
 def main():
+    # Fix Unicode output on Windows
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
     parser = argparse.ArgumentParser(
         description="Session Chronicle Manager — cross-tool session coherence"
     )
@@ -256,6 +411,8 @@ def main():
 
     # briefing
     p_brief = sub.add_parser("briefing", help="Generate session briefing")
+    p_brief.add_argument("--format", choices=["auto", "structured", "chronological"],
+                         default="auto", help="Briefing format (default: auto)")
     p_brief.add_argument("--detail", type=int, default=5, help="Detailed entries count (default: 5)")
     p_brief.add_argument("--oneliner", type=int, default=10, help="One-liner entries count (default: 10)")
     p_brief.add_argument("--max-bullets", type=int, default=3, help="Max bullets per entry (default: 3)")

@@ -17,15 +17,17 @@ New entries go at the TOP of `~/.session-coherence/chronicle.md`:
 
 ```
 ### YYYY-MM-DD HH:MM | project-name | short title
+- [decision] Key choice and reasoning
+- [status] Current state
 - What changed (specific, not vague)
-- Key decisions and reasoning
-- Current status
-- Open threads or next steps
+- [next] Open threads or next steps
 ```
 
 Or use the CLI:
 ```bash
-python ~/.session-coherence/chronicle-manager.py add --project "name" --title "title" --bullets "- item1" "- item2"
+python ~/.session-coherence/chronicle-manager.py add --project "name" --title "title" --bullets "- [status] state" "- item2"
 ```
+
+**Optional tags:** `[change]` (default), `[decision]`, `[blocker]`, `[status]`, `[next]`, `[priority]`. Untagged = change.
 
 **Rules:** 3-5 bullets per entry. Capture decisions and blockers. Don't update for trivial interactions. The chronicle is awareness, not instructions.

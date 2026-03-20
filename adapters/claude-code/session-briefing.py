@@ -9,9 +9,14 @@ Must always exit 0 — never block session start.
 """
 
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
+
+# Skip for Paperclip agent runs (agents get their own context)
+if os.environ.get('PAPERCLIP_AGENT_ID'):
+    sys.exit(0)
 
 
 # chronicle-manager.py location — set by installer or default to repo location
@@ -25,9 +30,11 @@ def get_briefing():
         return ""
 
     try:
+        env = os.environ.copy()
+        env["PYTHONIOENCODING"] = "utf-8"
         result = subprocess.run(
             ["python", str(MANAGER_SCRIPT), "briefing"],
-            capture_output=True, text=True, timeout=3
+            capture_output=True, text=True, timeout=3, env=env
         )
         if result.returncode == 0:
             return result.stdout.strip()

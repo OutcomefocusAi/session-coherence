@@ -12,10 +12,11 @@ Every new AI coding session starts cold. You re-explain which repo, what you wer
 
 A rolling session chronicle — a single markdown file shared across all your AI tools:
 
-- **Fixed cost**: ~300 tokens at session start, never grows mid-session
+- **Fixed cost**: ~500-800 tokens at session start, never grows mid-session
 - **Rolling window**: Last 20 sessions, oldest auto-trimmed
 - **Cross-tool**: All tools read/write the same file
 - **Not assumptive**: Shows recent work as context, doesn't assume continuation
+- **Structured**: Tagged bullets power semantic briefings with active threads, blockers, and decisions
 
 ## Setup
 
@@ -68,28 +69,38 @@ python ~/.session-coherence/chronicle-manager.py briefing
 Session Start                    During Session                Session End
 ┌─────────────┐                 ┌──────────────┐             ┌─────────────┐
 │ Read         │                 │ No auto-     │             │ Write 3-5   │
-│ chronicle    │──> ~300 token   │ injection    │             │ bullet      │──> chronicle
-│ (last 20     │    briefing     │ Zero cost    │             │ summary     │    updated
-│  sessions)   │    (one-time)   │ mid-session  │             │             │
+│ chronicle    │──> ~500-800     │ injection    │             │ tagged      │──> chronicle
+│ (last 20     │    token        │ Zero cost    │             │ bullet      │    updated
+│  sessions)   │    briefing     │ mid-session  │             │ summary     │
 └─────────────┘                 └──────────────┘             └─────────────┘
 ```
 
-### Example Briefing (what you see at session start)
+### Example Briefing (structured format — what you see at session start)
 
 ```
 ## Session Briefing
 
-Recent work:
-- Mar 16 | outcome-focus | M2 webhook fix
-  > Fixed Stripe retry logic in api/webhooks/stripe.ts
-  > Decision: exponential backoff for M3. M3 planning next.
-- Mar 15 | claude-voice | PTT investigation
-  > Root cause: edge-tts timeout. Blocked, needs async keep-alive.
-- Mar 14 | new-saas-project | Project initialization
-  > Ran /gsd:new-project, set up React + Supabase stack
+Active Threads:
+- claude-learn: v3.1.0 shipped, collective intelligence live
+- outcome-focus: M2 complete, M3 planning next
+- claude-voice: PTT blocked, needs async keep-alive
 
-Active projects: outcome-focus (M2 done, M3 next), claude-voice (PTT blocked)
+Blockers:
+- LinkedIn API approval pending — all post analytics blocked (outcome-focus)
+
+Recent Decisions:
+- JWT over sessions for auth — stateless API
+- Exponential backoff for M3 retry strategy
+
+Last 3 Sessions:
+- Mar 20: Built and shipped claude-learn plugin v3.1.0 (claude-learn)
+- Mar 19: Built two marketing demo videos (remotion-studio)
+- Mar 18: Social media analytics implementation (outcome-focus)
+
+Focus: Ship v2.0 before Friday
 ```
+
+When no tagged bullets exist, the briefing falls back to a chronological format automatically.
 
 ### Example Chronicle Entry (what gets written)
 
@@ -98,9 +109,22 @@ Active projects: outcome-focus (M2 done, M3 next), claude-voice (PTT blocked)
 - Fixed Stripe webhook retry in api/webhooks/stripe.ts (silent failure after 3rd retry)
 - Updated error handling to surface failures to dashboard
 - All M2 tests passing (147/147)
-- Decision: exponential backoff for M3 retry strategy
-- Status: M2 complete, M3 planning next
+- [decision] Exponential backoff for M3 retry strategy
+- [status] M2 complete, M3 planning next
 ```
+
+### Bullet Tags
+
+| Tag | Purpose |
+|-----|---------|
+| `[change]` | What was modified (default if no tag) |
+| `[decision]` | Choices made with reasoning |
+| `[blocker]` | What's stuck and why |
+| `[status]` | Current state of the project |
+| `[next]` | Immediate follow-up or next step |
+| `[priority]` | Top focus item |
+
+Tags are **optional** — untagged bullets default to `[change]`. Fully backward compatible with existing entries.
 
 ## CLI Reference
 
@@ -108,17 +132,23 @@ Active projects: outcome-focus (M2 done, M3 next), claude-voice (PTT blocked)
 # Check status
 python ~/.session-coherence/chronicle-manager.py status
 
-# Generate briefing (what the session start hook shows)
+# Generate briefing (auto-detects structured vs chronological)
 python ~/.session-coherence/chronicle-manager.py briefing
 
-# Add a session entry (auto-rotates if > 20 entries)
+# Force structured format
+python ~/.session-coherence/chronicle-manager.py briefing --format structured
+
+# Force chronological (legacy) format
+python ~/.session-coherence/chronicle-manager.py briefing --format chronological
+
+# Add a session entry with tags (auto-rotates if > 20 entries)
 python ~/.session-coherence/chronicle-manager.py add \
   --project "my-app" \
   --title "Added auth flow" \
   --bullets "- Implemented JWT auth in api/auth.ts" \
-           "- Added login/signup pages" \
-           "- Tests passing (23/23)" \
-           "- Status: auth complete, need password reset next"
+           "- [decision] JWT over sessions for stateless API" \
+           "- [status] Auth complete, need password reset next" \
+           "- [next] Implement password reset flow"
 
 # Manually rotate (usually not needed — add auto-rotates)
 python ~/.session-coherence/chronicle-manager.py rotate --max-entries 20
@@ -146,7 +176,8 @@ Per-tool adapters (installed to tool-specific locations):
 - **No per-prompt injection** — briefing injected once at session start, never mid-conversation
 - **No pip dependencies** — Python stdlib only, runs everywhere
 - **Tool-agnostic data** — plain markdown, any tool can read/write it
-- **Fixed token budget** — ~300 tokens at session start, doesn't grow
+- **Fixed token budget** — ~500-800 tokens at session start, doesn't grow
+- **Semantic structure** — tagged bullets enable structured briefings without breaking backward compatibility
 
 ## Entry Writing Protocol (for all tools)
 
@@ -157,6 +188,7 @@ Per-tool adapters (installed to tool-specific locations):
 
 **What to write:**
 - 3-5 bullets: what changed, key decisions, current status, next steps
+- Use `[decision]`, `[blocker]`, `[status]`, `[next]` tags for high-signal bullets
 - Specific enough to resume cold without re-explaining
 - From the user's perspective, not implementation minutiae
 

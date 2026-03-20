@@ -33,22 +33,36 @@ Use the chronicle manager CLI:
 python ~/.session-coherence/chronicle-manager.py add \
   --project "project-name" \
   --title "short descriptive title" \
-  --bullets "- What changed (specific files, features, decisions)" \
-           "- Key decisions and reasoning" \
-           "- Current status (tests passing/failing, blocked, ready for X)" \
-           "- Open threads or next steps"
+  --bullets "- [decision] Chose X over Y because Z" \
+           "- [status] Feature complete, tests passing" \
+           "- [next] Need to implement error handling" \
+           "- Implemented auth flow in api/auth.ts"
 ```
 
 Or edit `~/.session-coherence/chronicle.md` directly. New entries go at the TOP (after the HTML comment header):
 
 ```
 ### YYYY-MM-DD HH:MM | project-name | short descriptive title
-- What changed (specific files, features, or decisions — not vague)
-- Key decisions made and reasoning
-- Current status (tests passing/failing, blocked on X, ready for Y)
-- Open threads or next steps if any
-- [optional 5th bullet only if warranted]
+- [decision] Key choice made and reasoning
+- [status] Current state (tests passing/failing, deployed, blocked)
+- [blocker] What's stuck and why
+- [next] Immediate next step or follow-up
+- [priority] Most important thing to focus on
+- Plain bullet without tag (treated as a change)
 ```
+
+### Tag Reference
+
+| Tag | Purpose | Example |
+|-----|---------|---------|
+| `[change]` | What was modified (default if no tag) | `- [change] Rewrote auth middleware` |
+| `[decision]` | Choices made with reasoning | `- [decision] JWT over sessions — stateless API` |
+| `[blocker]` | What's stuck | `- [blocker] LinkedIn API approval pending` |
+| `[status]` | Current state | `- [status] M2 complete, M3 planning next` |
+| `[next]` | Immediate follow-up | `- [next] Implement password reset flow` |
+| `[priority]` | Top focus item | `- [priority] Ship v2.0 before Friday` |
+
+Tags are **optional** — untagged bullets default to `[change]`. Backward compatible with existing entries.
 
 **project-name**: derive from the repo/directory being worked on. Use `home` for general system work.
 
@@ -70,6 +84,7 @@ python ~/.session-coherence/chronicle-manager.py rotate --max-entries 20
 - Include enough detail to resume cold: "Fixed X in Y file because Z" not just "Fixed a bug"
 - Capture **decisions** — these are the highest-value memories
 - Note **blockers** explicitly — future sessions need to know what's stuck
+- Use tags for decisions, blockers, status, and next steps — they power the structured briefing
 - Keep each entry to 3-5 bullets, ~50-80 tokens
 
 ---

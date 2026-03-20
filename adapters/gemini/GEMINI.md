@@ -18,18 +18,20 @@ At natural breakpoints (task completed, user says "done", before context reset),
 python ~/.session-coherence/chronicle-manager.py add \
   --project "project-name" \
   --title "short descriptive title" \
-  --bullets "- What changed" "- Key decisions" "- Current status" "- Next steps"
+  --bullets "- [decision] Key choice" "- [status] Current state" "- What changed" "- [next] Follow-up"
 ```
 
 Or edit `~/.session-coherence/chronicle.md` directly. New entries go at the TOP:
 
 ```
 ### YYYY-MM-DD HH:MM | project-name | short title
+- [decision] Key choice and reasoning
+- [status] Current state
 - What changed (specific, not vague)
-- Key decisions and reasoning
-- Current status
-- Open threads or next steps
+- [next] Open threads or next steps
 ```
+
+**Optional tags:** `[change]` (default), `[decision]`, `[blocker]`, `[status]`, `[next]`, `[priority]`. Untagged bullets = change.
 
 **Rules:**
 - 3-5 bullets per entry, ~50-80 tokens
